@@ -168,9 +168,10 @@ export async function generateOrderPDF(order: Order, shopName: string): Promise<
   y -= 16
 
   // Vehicle Inspection
-  const inspection = order.vehicleInspection
+  type InspectionMap = Record<string, { checked: boolean; note?: string }>
+  const inspection = order.vehicleInspection as unknown as InspectionMap | undefined
   const inspectionKeys = inspection
-    ? Object.keys(INSPECTION_LABELS_PDF).filter((k) => (inspection as Record<string, { checked: boolean; note?: string }>)[k]?.checked)
+    ? Object.keys(INSPECTION_LABELS_PDF).filter((k) => inspection[k]?.checked)
     : []
 
   if (inspectionKeys.length > 0) {
@@ -181,7 +182,7 @@ export async function generateOrderPDF(order: Order, shopName: string): Promise<
     drawSection('VISTORIA DO VEÍCULO')
     for (const key of inspectionKeys) {
       ensureSpace(18)
-      const point = (inspection as Record<string, { checked: boolean; note?: string }>)[key]
+      const point = inspection![key]
       const label = `⚠ ${INSPECTION_LABELS_PDF[key]}`
       page.drawText(label, { x: margin + 4, y, size: 9, font: bold, color: red })
       if (point.note) {

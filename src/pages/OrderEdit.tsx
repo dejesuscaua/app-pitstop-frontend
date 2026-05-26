@@ -51,7 +51,7 @@ export function OrderEdit() {
       reset({
         laborPrice: order.laborPrice,
         notes: order.notes,
-        items: order.items.map((i) => ({ name: i.name, qty: i.qty, unitPrice: i.unitPrice })),
+        items: (order.items ?? []).map((i) => ({ name: i.name, qty: i.qty, unitPrice: i.unitPrice })),
       })
     }
   }, [order, reset])

@@ -104,7 +104,7 @@ export function OrderDetail() {
               </tr>
             </thead>
             <tbody>
-              {order.items.map((item, i) => (
+              {(order.items ?? []).map((item, i) => (
                 <tr key={`${item.name}-${i}`} className="border-b border-gray-50">
                   <td className="py-2 text-gray-700">{item.name}</td>
                   <td className="py-2 text-right text-gray-500">{item.qty}</td>

@@ -73,7 +73,7 @@ export function OrderPublic() {
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h3 className="font-semibold text-gray-900 text-sm mb-3">Peças / Serviços</h3>
           <div className="space-y-2">
-            {order.items.map((item, i) => (
+            {(order.items ?? []).map((item, i) => (
               <div key={`${item.name}-${i}`} className="flex items-center justify-between text-sm">
                 <span className="text-gray-700">{item.qty}× {item.name}</span>
                 <span className="font-medium text-gray-900">{BRL(item.qty * item.unitPrice)}</span>

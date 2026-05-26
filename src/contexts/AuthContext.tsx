@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import type { User } from 'firebase/auth'
@@ -9,6 +9,7 @@ interface AuthContextValue {
   tenantId: string | null
   shopName: string | null
   loading: boolean
+  refreshClaims: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -16,6 +17,7 @@ const AuthContext = createContext<AuthContextValue>({
   tenantId: null,
   shopName: null,
   loading: true,
+  refreshClaims: async () => {},
 })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -23,6 +25,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [tenantId, setTenantId] = useState<string | null>(null)
   const [shopName, setShopName] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const refreshClaims = useCallback(async () => {
+    const firebaseUser = auth.currentUser
+    if (!firebaseUser) return
+    const result = await firebaseUser.getIdTokenResult(true)
+    setTenantId((result.claims.tenantId as string) ?? null)
+    setShopName((result.claims.shopName as string) ?? null)
+  }, [])
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -41,8 +51,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return unsubscribe
   }, [])
 
+  const value = useMemo(
+    () => ({ user, tenantId, shopName, loading, refreshClaims }),
+    [user, tenantId, shopName, loading, refreshClaims]
+  )
+
   return (
-    <AuthContext.Provider value={{ user, tenantId, shopName, loading }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   )

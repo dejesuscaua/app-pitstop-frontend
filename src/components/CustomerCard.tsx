@@ -22,14 +22,14 @@ export function CustomerCard({ customer, onEdit, onDelete }: Readonly<Props>) {
           )}
         </div>
         <span className="shrink-0 text-xs bg-brand-50 text-brand-800 px-2 py-0.5 rounded-full">
-          {customer.vehicles.length} veículo{customer.vehicles.length === 1 ? '' : 's'}
+          {(customer.vehicles ?? []).length} veículo{(customer.vehicles ?? []).length === 1 ? '' : 's'}
         </span>
       </div>
 
       {/* Vehicles */}
-      {customer.vehicles.length > 0 && (
+      {(customer.vehicles ?? []).length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {customer.vehicles.map((v) => (
+          {(customer.vehicles ?? []).map((v) => (
             <span key={v.plate} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
               {v.plate} · {v.brand} {v.model}
             </span>

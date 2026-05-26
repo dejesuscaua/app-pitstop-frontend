@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useForm, useFieldArray, useWatch } from 'react-hook-form'
 import type { Control, UseFormRegister, FieldValues } from 'react-hook-form'
@@ -7,6 +7,7 @@ import { ItemRow } from '@/components/ItemRow'
 import { ProductCatalog } from '@/components/ProductCatalog'
 import { useOrders } from '@/hooks/useOrders'
 import { useProducts } from '@/hooks/useProducts'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface FormValues {
   laborPrice: number
@@ -22,8 +23,15 @@ export function OrderEdit() {
   const navigate = useNavigate()
   const { orders, update } = useOrders()
   const { products, create: createProduct } = useProducts()
+  const { tenantId } = useAuth()
 
   const order = orders.find((o) => o.id === id)
+
+  const [itemPhotos, setItemPhotos] = useState<Record<number, { old?: string; new?: string }>>({})
+
+  const handleItemPhotoChange = (index: number, field: 'old' | 'new', url: string | undefined) => {
+    setItemPhotos((prev) => ({ ...prev, [index]: { ...prev[index], [field]: url } }))
+  }
 
   const {
     register,
@@ -82,13 +90,18 @@ export function OrderEdit() {
     }
 
     await update(order.id, {
-      items: data.items.map((i) => ({
+      items: data.items.map((i, idx) => ({
         name: i.name,
         qty: Number(i.qty),
         unitPrice: Number(i.unitPrice),
+        oldPartPhoto: itemPhotos[idx]?.old ?? order.items[idx]?.oldPartPhoto,
+        newPartPhoto: itemPhotos[idx]?.new ?? order.items[idx]?.newPartPhoto,
       })),
       laborPrice: Number(data.laborPrice) || 0,
       notes: data.notes,
+      vehicleInspection: order.vehicleInspection,
+      vehiclePhotos: order.vehiclePhotos,
+      servicePhotos: order.servicePhotos,
     })
     navigate(`/orders/${order.id}`)
   }
@@ -125,6 +138,11 @@ export function OrderEdit() {
                     setValue(`items.${index}.name`, p.name)
                     setValue(`items.${index}.unitPrice`, p.unitPrice)
                   }}
+                  orderId={order.id}
+                  tenantId={tenantId ?? ''}
+                  oldPartPhoto={itemPhotos[index]?.old ?? order.items[index]?.oldPartPhoto}
+                  newPartPhoto={itemPhotos[index]?.new ?? order.items[index]?.newPartPhoto}
+                  onPhotoChange={(field, url) => handleItemPhotoChange(index, field, url)}
                 />
               ))}
             </div>

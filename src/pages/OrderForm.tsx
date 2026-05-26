@@ -39,7 +39,7 @@ const INSPECTION_KEYS = Object.keys(INSPECTION_LABELS) as (keyof VehicleInspecti
 function defaultInspection(): VehicleInspection {
   return Object.fromEntries(
     INSPECTION_KEYS.map((k) => [k, { checked: false, note: '' }])
-  ) as VehicleInspection
+  ) as unknown as VehicleInspection
 }
 
 interface FormValues {

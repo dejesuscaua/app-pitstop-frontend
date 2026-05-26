@@ -14,8 +14,8 @@ const INSPECTION_LABELS_PDF: Record<string, string> = {
   fluidos: 'Fluidos',
   freios: 'Freios',
   motor: 'Motor',
-  eletrica: 'Elétrica',
-  suspensao: 'Suspensão / Direção',
+  eletrica: 'Eletrica',
+  suspensao: 'Suspensao / Direcao',
   pneus: 'Pneus',
   arCondicionado: 'Ar condicionado',
   outros: 'Outros',
@@ -42,7 +42,7 @@ export async function generateOrderPDF(order: Order, shopName: string): Promise<
 
   const ensureSpace = (needed: number) => {
     if (y - needed < 60) {
-      page.drawText('PitStop OS — pitstop.app', { x: margin, y: 20, size: 8, font, color: gray })
+      page.drawText('PitStop OS - pitstop.app', { x: margin, y: 20, size: 8, font, color: gray })
       page = doc.addPage([pageWidth, pageHeight])
       y = pageHeight - margin
     }
@@ -59,7 +59,7 @@ export async function generateOrderPDF(order: Order, shopName: string): Promise<
 
   // Header bar
   page.drawRectangle({ x: 0, y: pageHeight - 70, width: pageWidth, height: 70, color: green })
-  page.drawText('ORDEM DE SERVIÇO', { x: margin, y: pageHeight - 48, size: 20, font: bold, color: rgb(1, 1, 1) })
+  page.drawText('ORDEM DE SERVICO', { x: margin, y: pageHeight - 48, size: 18, font: bold, color: rgb(1, 1, 1) })
   const osLabel = `OS #${order.id.slice(0, 8).toUpperCase()}`
   const osLabelW = font.widthOfTextAtSize(osLabel, 11)
   page.drawText(osLabel, { x: pageWidth - margin - osLabelW, y: pageHeight - 48, size: 11, font, color: rgb(1, 1, 1) })
@@ -109,15 +109,16 @@ export async function generateOrderPDF(order: Order, shopName: string): Promise<
   const colUnitX = margin + contentWidth * 0.72  // ~452
   const colTotalRight = pageWidth - margin        // right edge for total column
 
-  ensureSpace(24)
-  // Table header
+  ensureSpace(30)
+  // Table header - extra gap after section title
+  y -= 4
   page.drawRectangle({ x: margin, y: y - 4, width: contentWidth, height: 20, color: lightGray })
-  page.drawText('Descrição', { x: colDescX, y: y + 2, size: 9, font: bold, color: dark })
+  page.drawText('Descricao', { x: colDescX, y: y + 2, size: 9, font: bold, color: dark })
   page.drawText('Qtd', { x: colQtdX, y: y + 2, size: 9, font: bold, color: dark })
-  page.drawText('Unitário', { x: colUnitX, y: y + 2, size: 9, font: bold, color: dark })
+  page.drawText('Unitario', { x: colUnitX, y: y + 2, size: 9, font: bold, color: dark })
   const totalHeaderW = bold.widthOfTextAtSize('Total', 9)
   page.drawText('Total', { x: colTotalRight - totalHeaderW - 4, y: y + 2, size: 9, font: bold, color: dark })
-  y -= 20
+  y -= 22
 
   for (const item of order.items) {
     ensureSpace(18)
@@ -205,7 +206,7 @@ export async function generateOrderPDF(order: Order, shopName: string): Promise<
   }
 
   // Footer on last page
-  page.drawText('PitStop OS — pitstop.app', { x: margin, y: 20, size: 8, font, color: gray })
+  page.drawText('PitStop OS - pitstop.app', { x: margin, y: 20, size: 8, font, color: gray })
 
   return doc.save()
 }
@@ -303,7 +304,7 @@ async function addPhotoGrid(
     await drawPartImage(doc, page, urls[i], x, imgY + cellSize, cellSize)
   }
 
-  page.drawText('PitStop OS — pitstop.app', { x: margin, y: 20, size: 8, font: fonts.font, color: gray })
+  page.drawText('PitStop OS - pitstop.app', { x: margin, y: 20, size: 8, font: fonts.font, color: gray })
 }
 
 export async function generatePartsPDF(order: Order, shopName: string): Promise<Uint8Array> {
@@ -341,7 +342,7 @@ export async function generatePartsPDF(order: Order, shopName: string): Promise<
     await drawPartImage(doc, page, item.oldPartPhoto, margin, y, imgSize)
     await drawPartImage(doc, page, item.newPartPhoto, margin + imgSize + 20, y, imgSize)
 
-    page.drawText('PitStop OS — pitstop.app', { x: margin, y: 20, size: 8, font, color: gray })
+    page.drawText('PitStop OS - pitstop.app', { x: margin, y: 20, size: 8, font, color: gray })
   }
 
   if (doc.getPageCount() === 0) {

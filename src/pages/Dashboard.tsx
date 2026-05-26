@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
+  PieChart, Pie, Legend,
 } from 'recharts'
 import { Navbar } from '@/components/Navbar'
 import { StatusBadge } from '@/components/StatusBadge'
@@ -22,8 +22,6 @@ interface Stats {
   monthlyRevenue: { month: string; revenue: number }[]
   topItems: { name: string; count: number }[]
 }
-
-const STATUS_COLORS = ['#f59e0b', '#3b82f6', '#10b981']
 
 function StatCard({ label, value }: { readonly label: string; readonly value: string }) {
   return (
@@ -63,9 +61,9 @@ export function Dashboard() {
   }, [])
 
   const statusPieData = stats ? [
-    { name: 'Em aberto', value: stats.openCount },
-    { name: 'Prontas', value: stats.readyCount },
-    { name: 'Entregues', value: stats.deliveredCount ?? 0 },
+    { name: 'Em aberto', value: stats.openCount,    fill: '#f59e0b' },
+    { name: 'Prontas',   value: stats.readyCount,   fill: '#3b82f6' },
+    { name: 'Entregues', value: stats.deliveredCount ?? 0, fill: '#10b981' },
   ].filter(d => d.value > 0) : []
 
   return (
@@ -125,11 +123,7 @@ export function Dashboard() {
                         outerRadius={70}
                         paddingAngle={3}
                         dataKey="value"
-                      >
-                        {statusPieData.map((_, index) => (
-                          <Cell key={index} fill={STATUS_COLORS[index % STATUS_COLORS.length]} />
-                        ))}
-                      </Pie>
+                      />
                       <Tooltip
                         formatter={(value, name) => [value, name]}
                         contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}

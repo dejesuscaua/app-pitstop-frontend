@@ -24,7 +24,7 @@ function formatDate(iso: string) {
 export function CustomerNotes() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { tenantId } = useAuth()
+  const { tenantId, user } = useAuth()
   const { customers } = useCustomers()
   const customer = customers.find((c) => c.id === id)
 

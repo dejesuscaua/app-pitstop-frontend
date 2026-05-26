@@ -16,7 +16,7 @@ interface EditState {
 
 function ProductRow({ product, onSave, onDelete }: Readonly<{
   product: Product
-  onSave: (id: string, data: Partial<Omit<Product, 'id' | 'createdAt'>>) => Promise<void>
+  onSave: (id: string, data: Partial<Omit<Product, 'id' | 'createdAt'>>) => Promise<unknown>
   onDelete: (id: string) => Promise<void>
 }>) {
   const [editing, setEditing] = useState(false)

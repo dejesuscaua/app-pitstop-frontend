@@ -154,6 +154,93 @@ export async function generateOrderPDF(order: Order, shopName: string): Promise<
   return doc.save()
 }
 
+async function fetchImageBytes(url: string): Promise<Uint8Array | null> {
+  try {
+    const res = await fetch(url)
+    const buf = await res.arrayBuffer()
+    return new Uint8Array(buf)
+  } catch {
+    return null
+  }
+}
+
+async function embedImage(doc: PDFDocument, bytes: Uint8Array) {
+  try { return await doc.embedJpg(bytes) } catch { /* try png */ }
+  try { return await doc.embedPng(bytes) } catch { return null }
+}
+
+async function drawPartImage(
+  doc: PDFDocument,
+  page: ReturnType<typeof doc.addPage>,
+  url: string | undefined,
+  x: number,
+  y: number,
+  size: number,
+) {
+  if (!url) return
+  const bytes = await fetchImageBytes(url)
+  if (!bytes) return
+  const img = await embedImage(doc, bytes)
+  if (!img) return
+  const scaled = img.scaleToFit(size, size)
+  page.drawImage(img, { x, y: y - scaled.height, width: scaled.width, height: scaled.height })
+}
+
+export async function generatePartsPDF(order: Order, shopName: string): Promise<Uint8Array> {
+  const doc = await PDFDocument.create()
+  const font = await doc.embedFont(StandardFonts.Helvetica)
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold)
+  const green = rgb(0.11, 0.62, 0.46)
+  const dark = rgb(0.1, 0.1, 0.1)
+  const gray = rgb(0.45, 0.45, 0.45)
+
+  const itemsWithPhotos = (order.items ?? []).filter((i) => i.oldPartPhoto || i.newPartPhoto)
+
+  for (const item of itemsWithPhotos) {
+    const page = doc.addPage([595, 842])
+    const { width, height } = page.getSize()
+    const margin = 40
+
+    // Header
+    page.drawRectangle({ x: 0, y: height - 70, width, height: 70, color: green })
+    page.drawText('RELATÓRIO DE PEÇAS', { x: margin, y: height - 48, size: 16, font: bold, color: rgb(1, 1, 1) })
+    page.drawText(`OS #${order.id.slice(0, 8).toUpperCase()}`, { x: width - 160, y: height - 48, size: 10, font, color: rgb(1, 1, 1) })
+
+    let y = height - 95
+    page.drawText(shopName, { x: margin, y, size: 11, font: bold, color: dark })
+    y -= 14
+    page.drawText(order.customerName, { x: margin, y, size: 10, font, color: gray })
+    y -= 10
+    page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 0.5, color: rgb(0.8, 0.8, 0.8) })
+    y -= 20
+
+    // Item name
+    page.drawText(item.name, { x: margin, y, size: 13, font: bold, color: dark })
+    y -= 30
+
+    const imgSize = (width - margin * 2 - 20) / 2
+    const labelY = y
+    y -= 16
+
+    // Labels
+    if (item.oldPartPhoto) page.drawText('ANTES', { x: margin, y: labelY, size: 9, font: bold, color: gray })
+    if (item.newPartPhoto) page.drawText('DEPOIS', { x: margin + imgSize + 20, y: labelY, size: 9, font: bold, color: gray })
+
+    await drawPartImage(doc, page, item.oldPartPhoto, margin, y, imgSize)
+    await drawPartImage(doc, page, item.newPartPhoto, margin + imgSize + 20, y, imgSize)
+
+    // Footer
+    page.drawText('PitStop OS — pitstop.app', { x: margin, y: 20, size: 8, font, color: gray })
+  }
+
+  if (doc.getPageCount() === 0) {
+    const page = doc.addPage([595, 842])
+    page.drawText('Nenhuma foto de peça registrada.', { x: 40, y: 400, size: 12, font, color: gray })
+  }
+
+  return doc.save()
+}
+
 export function downloadPDF(bytes: Uint8Array, filename: string) {
   const blob = new Blob([bytes.buffer as ArrayBuffer], { type: 'application/pdf' })
   const url = URL.createObjectURL(blob)

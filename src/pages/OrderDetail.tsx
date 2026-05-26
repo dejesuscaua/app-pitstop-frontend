@@ -6,7 +6,7 @@ import { Navbar } from '@/components/Navbar'
 import { StatusBadge } from '@/components/StatusBadge'
 import { useOrders } from '@/hooks/useOrders'
 import { useAuth } from '@/contexts/AuthContext'
-import { generateOrderPDF, downloadPDF } from '@/services/pdf'
+import { generateOrderPDF, generatePartsPDF, downloadPDF } from '@/services/pdf'
 import api from '@/services/api'
 import type { OrderStatus, VehicleInspection, NotaFiscal } from '@/types'
 
@@ -54,6 +54,7 @@ export function OrderDetail() {
   const { orders, updateStatus } = useOrders()
   const { tenantId, shopName } = useAuth()
   const [pdfLoading, setPdfLoading] = useState(false)
+  const [partsLoading, setPartsLoading] = useState(false)
 
   // Notas fiscais
   const [notas, setNotas] = useState<NotaFiscal[]>([])
@@ -95,6 +96,16 @@ export function OrderDetail() {
       downloadPDF(bytes, `OS-${order.id.slice(0, 8)}.pdf`)
     } finally {
       setPdfLoading(false)
+    }
+  }
+
+  const handleDownloadPartsPDF = async () => {
+    setPartsLoading(true)
+    try {
+      const bytes = await generatePartsPDF(order, shopName ?? 'Minha Oficina')
+      downloadPDF(bytes, `OS-${order.id.slice(0, 8)}-pecas.pdf`)
+    } finally {
+      setPartsLoading(false)
     }
   }
 
@@ -376,6 +387,16 @@ export function OrderDetail() {
           >
             {pdfLoading ? 'Gerando…' : '↓ Baixar PDF'}
           </button>
+
+          {(order.items ?? []).some((i) => i.oldPartPhoto || i.newPartPhoto) && (
+            <button
+              onClick={handleDownloadPartsPDF}
+              disabled={partsLoading}
+              className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60 transition-colors"
+            >
+              {partsLoading ? 'Gerando…' : '↓ Relatório de peças'}
+            </button>
+          )}
 
           <button
             onClick={handleWhatsApp}

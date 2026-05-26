@@ -183,7 +183,7 @@ export async function generateOrderPDF(order: Order, shopName: string): Promise<
     for (const key of inspectionKeys) {
       ensureSpace(18)
       const point = inspection![key]
-      const label = `⚠ ${INSPECTION_LABELS_PDF[key]}`
+      const label = `! ${INSPECTION_LABELS_PDF[key]}`
       page.drawText(label, { x: margin + 4, y, size: 9, font: bold, color: red })
       if (point.note) {
         const noteX = margin + 4 + bold.widthOfTextAtSize(label, 9) + 8

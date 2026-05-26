@@ -17,7 +17,7 @@
     "react-dom": "^19.2.6",
     "react-hook-form": "^7.75.0",
     "react-router-dom": "^7.15.0",
-    "recharts": "^3.8.1"
+    "recharts": "^2.15.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

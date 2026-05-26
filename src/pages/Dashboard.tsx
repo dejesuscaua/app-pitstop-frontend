@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Legend,
+  PieChart, Pie, Cell, Legend,
 } from 'recharts'
 import { Navbar } from '@/components/Navbar'
 import { StatusBadge } from '@/components/StatusBadge'
@@ -22,6 +22,8 @@ interface Stats {
   monthlyRevenue: { month: string; revenue: number }[]
   topItems: { name: string; count: number }[]
 }
+
+const STATUS_COLORS = ['#f59e0b', '#3b82f6', '#10b981']
 
 function StatCard({ label, value }: { readonly label: string; readonly value: string }) {
   return (
@@ -61,9 +63,9 @@ export function Dashboard() {
   }, [])
 
   const statusPieData = stats ? [
-    { name: 'Em aberto', value: stats.openCount,    fill: '#f59e0b' },
-    { name: 'Prontas',   value: stats.readyCount,   fill: '#3b82f6' },
-    { name: 'Entregues', value: stats.deliveredCount ?? 0, fill: '#10b981' },
+    { name: 'Em aberto', value: stats.openCount },
+    { name: 'Prontas',   value: stats.readyCount },
+    { name: 'Entregues', value: stats.deliveredCount ?? 0 },
   ].filter(d => d.value > 0) : []
 
   return (
@@ -98,7 +100,7 @@ export function Dashboard() {
                         width={48}
                       />
                       <Tooltip
-                        formatter={(value) => [BRL(Number(value ?? 0)), 'Receita']}
+                        formatter={(value: number) => [BRL(value), 'Receita']}
                         contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
                       />
                       <Bar dataKey="revenue" fill="#6366f1" radius={[4, 4, 0, 0]} />
@@ -123,16 +125,15 @@ export function Dashboard() {
                         outerRadius={70}
                         paddingAngle={3}
                         dataKey="value"
-                      />
+                      >
+                        {statusPieData.map((entry, index) => (
+                          <Cell key={entry.name} fill={STATUS_COLORS[index % STATUS_COLORS.length]} />
+                        ))}
+                      </Pie>
                       <Tooltip
-                        formatter={(value, name) => [value, name]}
                         contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
                       />
-                      <Legend
-                        iconType="circle"
-                        iconSize={8}
-                        wrapperStyle={{ fontSize: 11 }}
-                      />
+                      <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
@@ -157,7 +158,7 @@ export function Dashboard() {
                       width={120}
                     />
                     <Tooltip
-                      formatter={(value) => [value, 'Ocorrências']}
+                      formatter={(value: number) => [value, 'Ocorrências']}
                       contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
                     />
                     <Bar dataKey="count" fill="#10b981" radius={[0, 4, 4, 0]} />

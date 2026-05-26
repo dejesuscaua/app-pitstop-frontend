@@ -6,11 +6,23 @@ export interface Vehicle {
   km: number
 }
 
+export interface CustomerAddress {
+  street: string
+  number: string
+  complement?: string
+  neighborhood: string
+  city: string
+  state: string
+  zipCode: string
+}
+
 export interface Customer {
   id: string
   name: string
   phone: string
   cpf: string
+  email?: string
+  address?: CustomerAddress
   vehicles: Vehicle[]
   createdAt: string
 }
@@ -21,6 +33,25 @@ export interface OrderItem {
   name: string
   qty: number
   unitPrice: number
+  oldPartPhoto?: string
+  newPartPhoto?: string
+}
+
+export interface InspectionPoint {
+  checked: boolean
+  note?: string
+}
+
+export interface VehicleInspection {
+  frontLeft: InspectionPoint
+  frontRight: InspectionPoint
+  rearLeft: InspectionPoint
+  rearRight: InspectionPoint
+  hood: InspectionPoint
+  trunk: InspectionPoint
+  roof: InspectionPoint
+  frontBumper: InspectionPoint
+  rearBumper: InspectionPoint
 }
 
 export interface Product {
@@ -79,6 +110,9 @@ export interface Order {
   total: number
   notes: string
   pdfUrl?: string
+  vehicleInspection?: VehicleInspection
+  vehiclePhotos?: string[]
+  servicePhotos?: string[]
   createdAt: string
   updatedAt: string
 }

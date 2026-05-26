@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { Navbar } from '@/components/Navbar'
@@ -18,15 +18,21 @@ const maskPhone = (v: string) =>
     .replace(/(\d{2})(\d)/, '($1) $2')
     .replace(/(\d{5})(\d)/, '$1-$2')
 
+const maskCEP = (v: string) =>
+  v.replace(/\D/g, '').slice(0, 8)
+    .replace(/(\d{5})(\d)/, '$1-$2')
+
 export function CustomerForm() {
   const { id } = useParams<{ id: string }>()
   const isEdit = Boolean(id)
   const navigate = useNavigate()
   const { customers, create, update } = useCustomers()
+  const [showAddress, setShowAddress] = useState(false)
+  const [cepLoading, setCepLoading] = useState(false)
 
   const { register, handleSubmit, control, reset, setValue, formState: { isSubmitting, errors } } =
     useForm<FormValues>({
-      defaultValues: { name: '', phone: '', cpf: '', vehicles: [] },
+      defaultValues: { name: '', phone: '', cpf: '', email: '', address: undefined, vehicles: [] },
     })
 
   const { fields, append, remove } = useFieldArray({ control, name: 'vehicles' })
@@ -34,12 +40,43 @@ export function CustomerForm() {
   useEffect(() => {
     if (isEdit && id) {
       const found = customers.find((c) => c.id === id)
-      if (found) reset({ name: found.name, phone: found.phone, cpf: found.cpf, vehicles: found.vehicles })
+      if (found) {
+        reset({
+          name: found.name,
+          phone: found.phone,
+          cpf: found.cpf,
+          email: found.email ?? '',
+          address: found.address,
+          vehicles: found.vehicles,
+        })
+        if (found.address) setShowAddress(true)
+      }
     }
   }, [isEdit, id, customers, reset])
 
+  const fetchCEP = async (cep: string) => {
+    const clean = cep.replace(/\D/g, '')
+    if (clean.length !== 8) return
+    setCepLoading(true)
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`)
+      const data = await res.json()
+      if (!data.erro) {
+        setValue('address.street', data.logradouro)
+        setValue('address.neighborhood', data.bairro)
+        setValue('address.city', data.localidade)
+        setValue('address.state', data.uf)
+      }
+    } catch {
+      // silently ignore CEP lookup failure
+    } finally {
+      setCepLoading(false)
+    }
+  }
+
   const onSubmit = async (data: FormValues) => {
     data.vehicles = data.vehicles.map((v) => ({ ...v, plate: v.plate.toUpperCase() }))
+    if (!showAddress) data.address = undefined
     if (isEdit && id) {
       await update(id, data)
     } else {
@@ -53,6 +90,7 @@ export function CustomerForm() {
       <Navbar title={isEdit ? 'Editar cliente' : 'Novo cliente'} />
       <div className="p-4 sm:p-6 max-w-xl mx-auto">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          {/* Dados pessoais */}
           <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
@@ -86,6 +124,126 @@ export function CustomerForm() {
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none"
               />
             </div>
+
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
+              <input
+                id="email"
+                type="email"
+                {...register('email', {
+                  pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'E-mail inválido' },
+                })}
+                placeholder="email@exemplo.com"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none"
+              />
+              {errors.email && <p className="text-xs text-danger mt-1">{errors.email.message}</p>}
+            </div>
+          </div>
+
+          {/* Endereço */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <button
+              type="button"
+              onClick={() => setShowAddress((v) => !v)}
+              className="flex items-center justify-between w-full"
+            >
+              <h3 className="font-semibold text-gray-900 text-sm">Endereço</h3>
+              <span className="text-xs text-brand-600">{showAddress ? '▲ Recolher' : '▼ Expandir'}</span>
+            </button>
+
+            {showAddress && (
+              <div className="mt-4 space-y-3">
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label htmlFor="zipCode" className="block text-xs text-gray-500 mb-1">CEP</label>
+                    <input
+                      id="zipCode"
+                      {...register('address.zipCode')}
+                      onChange={(e) => setValue('address.zipCode', maskCEP(e.target.value))}
+                      onBlur={(e) => fetchCEP(e.target.value)}
+                      placeholder="00000-000"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const el = document.getElementById('zipCode') as HTMLInputElement | null
+                        if (el) fetchCEP(el.value)
+                      }}
+                      disabled={cepLoading}
+                      className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60 transition-colors"
+                    >
+                      {cepLoading ? '…' : 'Buscar'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="sm:col-span-2">
+                    <label htmlFor="street" className="block text-xs text-gray-500 mb-1">Rua</label>
+                    <input
+                      id="street"
+                      {...register('address.street')}
+                      placeholder="Nome da rua"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="number" className="block text-xs text-gray-500 mb-1">Número</label>
+                    <input
+                      id="number"
+                      {...register('address.number')}
+                      placeholder="123"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="complement" className="block text-xs text-gray-500 mb-1">Complemento</label>
+                  <input
+                    id="complement"
+                    {...register('address.complement')}
+                    placeholder="Apto, bloco…"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="neighborhood" className="block text-xs text-gray-500 mb-1">Bairro</label>
+                  <input
+                    id="neighborhood"
+                    {...register('address.neighborhood')}
+                    placeholder="Bairro"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="sm:col-span-2">
+                    <label htmlFor="city" className="block text-xs text-gray-500 mb-1">Cidade</label>
+                    <input
+                      id="city"
+                      {...register('address.city')}
+                      placeholder="Cidade"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="state" className="block text-xs text-gray-500 mb-1">Estado</label>
+                    <input
+                      id="state"
+                      {...register('address.state')}
+                      placeholder="UF"
+                      maxLength={2}
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm uppercase focus:border-brand-400 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Vehicles */}

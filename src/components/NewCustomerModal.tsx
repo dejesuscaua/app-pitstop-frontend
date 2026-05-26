@@ -12,11 +12,19 @@ interface FormValues {
   name: string
   phone: string
   cpf: string
+  email: string
   brand: string
   model: string
   plate: string
   year: number
   km: number
+  zipCode: string
+  street: string
+  number: string
+  complement: string
+  neighborhood: string
+  city: string
+  state: string
 }
 
 const maskPhone = (v: string) =>
@@ -30,9 +38,15 @@ const maskCPF = (v: string) =>
     .replace(/(\d{3})(\d)/, '$1.$2')
     .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
 
+const maskCEP = (v: string) =>
+  v.replace(/\D/g, '').slice(0, 8)
+    .replace(/(\d{5})(\d)/, '$1-$2')
+
 export function NewCustomerModal({ onCreate, onClose, onCreated }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [showVehicle, setShowVehicle] = useState(false)
+  const [showAddress, setShowAddress] = useState(false)
+  const [cepLoading, setCepLoading] = useState(false)
 
   useEffect(() => {
     dialogRef.current?.showModal()
@@ -45,17 +59,59 @@ export function NewCustomerModal({ onCreate, onClose, onCreated }: Props) {
     formState: { isSubmitting, errors },
   } = useForm<FormValues>({
     defaultValues: {
-      name: '', phone: '', cpf: '',
+      name: '', phone: '', cpf: '', email: '',
       brand: '', model: '', plate: '',
       year: new Date().getFullYear(), km: 0,
+      zipCode: '', street: '', number: '', complement: '',
+      neighborhood: '', city: '', state: '',
     },
   })
+
+  const fetchCEP = async (cep: string) => {
+    const clean = cep.replace(/\D/g, '')
+    if (clean.length !== 8) return
+    setCepLoading(true)
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`)
+      const data = await res.json()
+      if (!data.erro) {
+        setValue('street', data.logradouro)
+        setValue('neighborhood', data.bairro)
+        setValue('city', data.localidade)
+        setValue('state', data.uf)
+      }
+    } catch {
+      // silently ignore CEP lookup failure
+    } finally {
+      setCepLoading(false)
+    }
+  }
 
   const onSubmit = async (data: FormValues) => {
     const vehicles = showVehicle && data.plate.trim()
       ? [{ brand: data.brand, model: data.model, plate: data.plate.toUpperCase(), year: Number(data.year), km: Number(data.km) }]
       : []
-    const created = await onCreate({ name: data.name, phone: data.phone, cpf: data.cpf, vehicles })
+
+    const address = showAddress && data.zipCode.trim()
+      ? {
+          street: data.street,
+          number: data.number,
+          complement: data.complement || undefined,
+          neighborhood: data.neighborhood,
+          city: data.city,
+          state: data.state,
+          zipCode: data.zipCode,
+        }
+      : undefined
+
+    const created = await onCreate({
+      name: data.name,
+      phone: data.phone,
+      cpf: data.cpf,
+      email: data.email || undefined,
+      address,
+      vehicles,
+    })
     onCreated(created)
     onClose()
   }
@@ -76,7 +132,7 @@ export function NewCustomerModal({ onCreate, onClose, onCreated }: Props) {
         </button>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
         <div>
           <label htmlFor="nc-name" className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
           <input id="nc-name" {...register('name', { required: 'Campo obrigatório' })} autoFocus
@@ -102,6 +158,90 @@ export function NewCustomerModal({ onCreate, onClose, onCreated }: Props) {
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none" />
         </div>
 
+        <div>
+          <label htmlFor="nc-email" className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
+          <input id="nc-email" type="email"
+            {...register('email', {
+              pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'E-mail inválido' },
+            })}
+            placeholder="email@exemplo.com"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none" />
+          {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>}
+        </div>
+
+        {/* Endereço colapsável */}
+        <div>
+          <button type="button" onClick={() => setShowAddress((v) => !v)}
+            className="text-sm text-brand-600 hover:underline">
+            {showAddress ? '− Remover endereço' : '+ Adicionar endereço'}
+          </button>
+
+          {showAddress && (
+            <div className="mt-3 space-y-3 rounded-lg border border-gray-100 p-3">
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label htmlFor="nc-zip" className="block text-xs text-gray-500 mb-1">CEP</label>
+                  <input id="nc-zip" {...register('zipCode')}
+                    onChange={(e) => setValue('zipCode', maskCEP(e.target.value))}
+                    onBlur={(e) => fetchCEP(e.target.value)}
+                    placeholder="00000-000"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-400 focus:outline-none" />
+                </div>
+                <div className="flex items-end">
+                  <button type="button"
+                    onClick={() => {
+                      const el = document.getElementById('nc-zip') as HTMLInputElement | null
+                      if (el) fetchCEP(el.value)
+                    }}
+                    disabled={cepLoading}
+                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60">
+                    {cepLoading ? '…' : 'Buscar'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-2">
+                  <label htmlFor="nc-street" className="block text-xs text-gray-500 mb-1">Rua</label>
+                  <input id="nc-street" {...register('street')} placeholder="Rua"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-400 focus:outline-none" />
+                </div>
+                <div>
+                  <label htmlFor="nc-number" className="block text-xs text-gray-500 mb-1">Número</label>
+                  <input id="nc-number" {...register('number')} placeholder="123"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-400 focus:outline-none" />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="nc-complement" className="block text-xs text-gray-500 mb-1">Complemento</label>
+                <input id="nc-complement" {...register('complement')} placeholder="Apto, bloco…"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-400 focus:outline-none" />
+              </div>
+
+              <div>
+                <label htmlFor="nc-neighborhood" className="block text-xs text-gray-500 mb-1">Bairro</label>
+                <input id="nc-neighborhood" {...register('neighborhood')} placeholder="Bairro"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-400 focus:outline-none" />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-2">
+                  <label htmlFor="nc-city" className="block text-xs text-gray-500 mb-1">Cidade</label>
+                  <input id="nc-city" {...register('city')} placeholder="Cidade"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-400 focus:outline-none" />
+                </div>
+                <div>
+                  <label htmlFor="nc-state" className="block text-xs text-gray-500 mb-1">Estado</label>
+                  <input id="nc-state" {...register('state')} placeholder="UF" maxLength={2}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm uppercase focus:border-brand-400 focus:outline-none" />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Veículo colapsável */}
         <div>
           <button type="button" onClick={() => setShowVehicle((v) => !v)}
             className="text-sm text-brand-600 hover:underline">

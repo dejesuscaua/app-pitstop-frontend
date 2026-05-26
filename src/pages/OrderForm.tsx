@@ -6,11 +6,13 @@ import type { Control, UseFormRegister, FieldValues } from 'react-hook-form'
 import { Navbar } from '@/components/Navbar'
 import { ItemRow } from '@/components/ItemRow'
 import { ProductCatalog } from '@/components/ProductCatalog'
+import { PhotoUploadBlock } from '@/components/PhotoUploadBlock'
 import { useCustomers } from '@/hooks/useCustomers'
 import { useOrders } from '@/hooks/useOrders'
 import { useProducts } from '@/hooks/useProducts'
+import { useAuth } from '@/contexts/AuthContext'
 import api from '@/services/api'
-import type { Customer, Vehicle } from '@/types'
+import type { Customer, Vehicle, VehicleInspection } from '@/types'
 
 interface FromAppointment {
   appointmentId: string
@@ -20,12 +22,33 @@ interface FromAppointment {
   vehicleInfo: { brand: string; model: string; plate: string; year: number }
 }
 
+const INSPECTION_LABELS: Record<keyof VehicleInspection, string> = {
+  frontLeft: 'Dianteiro Esquerdo',
+  frontRight: 'Dianteiro Direito',
+  rearLeft: 'Traseiro Esquerdo',
+  rearRight: 'Traseiro Direito',
+  hood: 'Capô',
+  trunk: 'Porta-malas',
+  roof: 'Teto',
+  frontBumper: 'Para-choque Dianteiro',
+  rearBumper: 'Para-choque Traseiro',
+}
+
+const INSPECTION_KEYS = Object.keys(INSPECTION_LABELS) as (keyof VehicleInspection)[]
+
+function defaultInspection(): VehicleInspection {
+  return Object.fromEntries(
+    INSPECTION_KEYS.map((k) => [k, { checked: false, note: '' }])
+  ) as VehicleInspection
+}
+
 interface FormValues {
   customerId: string
   vehicleIndex: string
   laborPrice: number
   notes: string
   items: { name: string; qty: number; unitPrice: number }[]
+  vehicleInspection: VehicleInspection
 }
 
 const BRL = (v: number) =>
@@ -36,11 +59,17 @@ export function OrderForm() {
   const location = useLocation()
   const fromAppointment = (location.state as { fromAppointment?: FromAppointment } | null)?.fromAppointment
 
+  const { tenantId } = useAuth()
   const { customers, create: createCustomer } = useCustomers()
   const { create } = useOrders()
   const { products, create: createProduct } = useProducts()
   const [selectedVehicles, setSelectedVehicles] = useState<Vehicle[]>([])
   const [showNewCustomer, setShowNewCustomer] = useState(false)
+
+  const [draftOrderId] = useState(() => crypto.randomUUID())
+  const [vehiclePhotos, setVehiclePhotos] = useState<string[]>([])
+  const [servicePhotos, setServicePhotos] = useState<string[]>([])
+  const [itemPhotos, setItemPhotos] = useState<Record<number, { old?: string; new?: string }>>({})
 
   const {
     register,
@@ -56,6 +85,7 @@ export function OrderForm() {
       laborPrice: 0,
       notes: '',
       items: [{ name: '', qty: 1, unitPrice: 0 }],
+      vehicleInspection: defaultInspection(),
     },
   })
 
@@ -69,7 +99,6 @@ export function OrderForm() {
   )
   const total = totalParts + (Number(laborPrice) || 0)
 
-  // Pre-fill from appointment when customers are loaded
   useEffect(() => {
     if (!fromAppointment || customers.length === 0) return
     const customer = customers.find((c) => c.id === fromAppointment.customerId)
@@ -94,6 +123,13 @@ export function OrderForm() {
     setSelectedVehicles(customer?.vehicles ?? [])
   }
 
+  const handleItemPhotoChange = (index: number, field: 'old' | 'new', url: string | undefined) => {
+    setItemPhotos((prev) => ({
+      ...prev,
+      [index]: { ...prev[index], [field]: url },
+    }))
+  }
+
   const onSubmit = async (data: FormValues) => {
     const customer = customers.find((c) => c.id === data.customerId)
     if (!customer) return
@@ -112,11 +148,16 @@ export function OrderForm() {
       vehicleInfo: vehicle ?? { brand: '', model: '', plate: '', year: 0, km: 0 },
       laborPrice: Number(data.laborPrice) || 0,
       notes: data.notes,
-      items: data.items.map((i) => ({
-        name: i.name,
-        qty: Number(i.qty),
-        unitPrice: Number(i.unitPrice),
+      items: data.items.map((item, idx) => ({
+        name: item.name,
+        qty: Number(item.qty),
+        unitPrice: Number(item.unitPrice),
+        oldPartPhoto: itemPhotos[idx]?.old,
+        newPartPhoto: itemPhotos[idx]?.new,
       })),
+      vehicleInspection: data.vehicleInspection,
+      vehiclePhotos,
+      servicePhotos,
     })
 
     if (fromAppointment?.appointmentId && newOrder?.id) {
@@ -127,6 +168,14 @@ export function OrderForm() {
   }
 
   const customerId = watch('customerId')
+  const inspection = useWatch({ control, name: 'vehicleInspection' })
+
+  const vehicleStoragePath = tenantId
+    ? `tenants/${tenantId}/orders/${draftOrderId}/vehicle`
+    : `orders/${draftOrderId}/vehicle`
+  const serviceStoragePath = tenantId
+    ? `tenants/${tenantId}/orders/${draftOrderId}/service`
+    : `orders/${draftOrderId}/service`
 
   return (
     <div>
@@ -194,6 +243,11 @@ export function OrderForm() {
                     setValue(`items.${index}.name`, p.name)
                     setValue(`items.${index}.unitPrice`, p.unitPrice)
                   }}
+                  orderId={draftOrderId}
+                  tenantId={tenantId ?? ''}
+                  oldPartPhoto={itemPhotos[index]?.old}
+                  newPartPhoto={itemPhotos[index]?.new}
+                  onPhotoChange={(field, url) => handleItemPhotoChange(index, field, url)}
                 />
               ))}
             </div>
@@ -211,6 +265,53 @@ export function OrderForm() {
                 onSelect={(p) => append({ name: p.name, qty: 1, unitPrice: p.unitPrice })}
               />
             </div>
+          </div>
+
+          {/* Vistoria do veículo */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <h3 className="font-semibold text-gray-900 text-sm mb-4">Vistoria do veículo</h3>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {INSPECTION_KEYS.map((key) => (
+                <div key={key} className="rounded-lg border border-gray-100 p-3 space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      {...register(`vehicleInspection.${key}.checked`)}
+                      className="h-4 w-4 rounded border-gray-300 text-brand-400 focus:ring-brand-400"
+                    />
+                    <span className={`text-sm font-medium ${inspection?.[key]?.checked ? 'text-danger' : 'text-gray-700'}`}>
+                      {INSPECTION_LABELS[key]}
+                    </span>
+                  </label>
+                  {inspection?.[key]?.checked && (
+                    <input
+                      {...register(`vehicleInspection.${key}.note`)}
+                      placeholder="Observação (ex: arranhado)"
+                      className="w-full rounded-md border border-gray-200 px-2 py-1 text-xs focus:border-brand-400 focus:outline-none"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Fotos */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-5">
+            <h3 className="font-semibold text-gray-900 text-sm">Fotos</h3>
+            <PhotoUploadBlock
+              label="Fotos do veículo (entrada)"
+              storagePath={vehicleStoragePath}
+              urls={vehiclePhotos}
+              onAdd={(url) => setVehiclePhotos((prev) => [...prev, url])}
+              onRemove={(url) => setVehiclePhotos((prev) => prev.filter((u) => u !== url))}
+            />
+            <PhotoUploadBlock
+              label="Fotos do serviço"
+              storagePath={serviceStoragePath}
+              urls={servicePhotos}
+              onAdd={(url) => setServicePhotos((prev) => [...prev, url])}
+              onRemove={(url) => setServicePhotos((prev) => prev.filter((u) => u !== url))}
+            />
           </div>
 
           {/* Labor + Notes */}

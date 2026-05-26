@@ -29,7 +29,7 @@ export function useOrders() {
 
   const update = async (
     id: string,
-    payload: Pick<Order, 'items' | 'laborPrice' | 'notes'>
+    payload: Pick<Order, 'items' | 'laborPrice' | 'notes' | 'vehicleInspection' | 'vehiclePhotos' | 'servicePhotos'>
   ) => {
     const { data } = await api.put<Order>(`/orders/${id}`, payload)
     setOrders((prev) => prev.map((o) => (o.id === id ? data : o)))

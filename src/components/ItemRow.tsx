@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState, useId } from 'react'
 import type { UseFormRegister, Control, FieldValues } from 'react-hook-form'
 import { useWatch } from 'react-hook-form'
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
+import { storage } from '@/services/firebase'
 import type { Product } from '@/types'
 
 const BRL = (v: number) =>
@@ -13,9 +15,104 @@ interface Props {
   readonly onRemove: () => void
   readonly products: Product[]
   readonly onSelectProduct: (product: Pick<Product, 'name' | 'unitPrice'>) => void
+  readonly orderId: string
+  readonly tenantId: string
+  readonly oldPartPhoto?: string
+  readonly newPartPhoto?: string
+  readonly onPhotoChange: (field: 'old' | 'new', url: string | undefined) => void
 }
 
-export function ItemRow({ index, register, control, onRemove, products, onSelectProduct }: Props) {
+function MiniPhotoUpload({
+  label,
+  storagePath,
+  url,
+  onUrl,
+}: {
+  readonly label: string
+  readonly storagePath: string
+  readonly url?: string
+  readonly onUrl: (url: string | undefined) => void
+}) {
+  const inputId = useId()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+
+  const handleFile = (file: File) => {
+    const path = `${storagePath}/${Date.now()}_${file.name}`
+    const sRef = storageRef(storage, path)
+    setUploading(true)
+    const task = uploadBytesResumable(sRef, file)
+    task.on('state_changed', null, () => setUploading(false), async () => {
+      const dlUrl = await getDownloadURL(task.snapshot.ref)
+      onUrl(dlUrl)
+      setUploading(false)
+    })
+  }
+
+  if (url) {
+    return (
+      <div className="relative">
+        <img
+          src={url}
+          alt={label}
+          className="h-10 w-10 object-cover rounded-md border border-gray-200"
+          title={label}
+        />
+        <button
+          type="button"
+          onClick={() => onUrl(undefined)}
+          className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-danger text-white text-[10px] leading-none"
+          aria-label={`Remover ${label}`}
+        >
+          ×
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <input
+        ref={fileRef}
+        id={inputId}
+        type="file"
+        accept="image/*"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }}
+        disabled={uploading}
+        className="hidden"
+      />
+      <label
+        htmlFor={inputId}
+        className="flex items-center gap-1 rounded-md border border-dashed border-gray-300 px-2 py-1 text-xs text-gray-400 cursor-pointer hover:border-brand-300 hover:text-brand-600 transition-colors"
+        title={label}
+      >
+        {uploading ? '…' : (
+          <>
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            {label}
+          </>
+        )}
+      </label>
+    </>
+  )
+}
+
+export function ItemRow({
+  index,
+  register,
+  control,
+  onRemove,
+  products,
+  onSelectProduct,
+  orderId,
+  tenantId,
+  oldPartPhoto,
+  newPartPhoto,
+  onPhotoChange,
+}: Props) {
   const qty = useWatch({ control, name: `items.${index}.qty` }) as number | undefined
   const unitPrice = useWatch({ control, name: `items.${index}.unitPrice` }) as number | undefined
   const lineTotal = (Number(qty) || 0) * (Number(unitPrice) || 0)
@@ -29,6 +126,10 @@ export function ItemRow({ index, register, control, onRemove, products, onSelect
   const suggestions = filtered.slice(0, 8)
 
   const nameField = register(`items.${index}.name`)
+
+  const basePartPath = tenantId
+    ? `tenants/${tenantId}/orders/${orderId}/parts/${index}`
+    : `orders/${orderId}/parts/${index}`
 
   return (
     <div className="rounded-lg border border-gray-100 p-3 space-y-2 bg-gray-50">
@@ -121,6 +222,23 @@ export function ItemRow({ index, register, control, onRemove, products, onSelect
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
+      </div>
+
+      {/* Part photos */}
+      <div className="flex items-center gap-2 pt-1">
+        <span className="text-xs text-gray-400 shrink-0">Fotos da peça:</span>
+        <MiniPhotoUpload
+          label="Retirada"
+          storagePath={`${basePartPath}/old`}
+          url={oldPartPhoto}
+          onUrl={(url) => onPhotoChange('old', url)}
+        />
+        <MiniPhotoUpload
+          label="Nova"
+          storagePath={`${basePartPath}/new`}
+          url={newPartPhoto}
+          onUrl={(url) => onPhotoChange('new', url)}
+        />
       </div>
     </div>
   )

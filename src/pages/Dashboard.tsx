@@ -100,7 +100,7 @@ export function Dashboard() {
                         width={48}
                       />
                       <Tooltip
-                        formatter={(value: number) => [BRL(value), 'Receita']}
+                        formatter={(value) => [BRL(Number(value ?? 0)), 'Receita']}
                         contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
                       />
                       <Bar dataKey="revenue" fill="#6366f1" radius={[4, 4, 0, 0]} />
@@ -131,7 +131,7 @@ export function Dashboard() {
                         ))}
                       </Pie>
                       <Tooltip
-                        formatter={(value: number, name: string) => [value, name]}
+                        formatter={(value, name) => [value, name]}
                         contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
                       />
                       <Legend
@@ -163,7 +163,7 @@ export function Dashboard() {
                       width={120}
                     />
                     <Tooltip
-                      formatter={(value: number) => [value, 'Ocorrências']}
+                      formatter={(value) => [value, 'Ocorrências']}
                       contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
                     />
                     <Bar dataKey="count" fill="#10b981" radius={[0, 4, 4, 0]} />

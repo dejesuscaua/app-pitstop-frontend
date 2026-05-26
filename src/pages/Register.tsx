@@ -14,7 +14,7 @@ interface FormValues {
 }
 
 export function Register() {
-  const { user, loading } = useAuth()
+  const { user, loading, refreshClaims } = useAuth()
   const navigate = useNavigate()
   const [authError, setAuthError] = useState<string | null>(null)
   const { register, handleSubmit, watch, formState: { isSubmitting, errors } } = useForm<FormValues>()
@@ -24,10 +24,9 @@ export function Register() {
   const onSubmit = async ({ shopName, email, password }: FormValues) => {
     setAuthError(null)
     try {
-      const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, email, password)
+      await createUserWithEmailAndPassword(auth, email, password)
       await api.post('/auth/register', { shopName })
-      // Force token refresh to get the tenantId custom claim
-      await firebaseUser.getIdToken(true)
+      await refreshClaims()
       navigate('/dashboard')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro ao criar conta.'

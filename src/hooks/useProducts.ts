@@ -11,7 +11,7 @@ export function useProducts() {
     try {
       setLoading(true)
       const { data } = await api.get<Product[]>('/products')
-      setProducts(data)
+      setProducts(Array.isArray(data) ? data : [])
     } catch {
       setError('Erro ao carregar produtos')
     } finally {

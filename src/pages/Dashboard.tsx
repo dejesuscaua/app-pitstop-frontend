@@ -32,10 +32,10 @@ export function Dashboard() {
 
   useEffect(() => {
     api.get<Stats>('/dashboard/stats')
-      .then(({ data }) => setStats(data))
+      .then(({ data }) => setStats(data && typeof data === 'object' ? { ...data, recent: Array.isArray(data.recent) ? data.recent : [] } : null))
       .finally(() => setLoading(false))
     api.get<Appointment[]>('/appointments/today')
-      .then(({ data }) => setTodayAppointments(data))
+      .then(({ data }) => setTodayAppointments(Array.isArray(data) ? data : []))
       .catch(() => {})
   }, [])
 

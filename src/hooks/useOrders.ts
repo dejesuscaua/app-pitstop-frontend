@@ -11,7 +11,7 @@ export function useOrders() {
     try {
       setLoading(true)
       const { data } = await api.get<Order[]>('/orders')
-      setOrders(data)
+      setOrders(Array.isArray(data) ? data : [])
     } catch {
       setError('Erro ao carregar ordens')
     } finally {

@@ -14,7 +14,7 @@ export function useAppointments() {
     try {
       setLoading(true)
       const { data } = await api.get<Appointment[]>('/appointments')
-      setAppointments(data)
+      setAppointments(Array.isArray(data) ? data : [])
     } catch {
       setError('Erro ao carregar agendamentos')
     } finally {

@@ -11,7 +11,7 @@ export function useCustomers() {
     try {
       setLoading(true)
       const { data } = await api.get<Customer[]>('/customers')
-      setCustomers(data)
+      setCustomers(Array.isArray(data) ? data : [])
     } catch {
       setError('Erro ao carregar clientes')
     } finally {

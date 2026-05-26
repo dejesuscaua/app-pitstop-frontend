@@ -23,15 +23,14 @@ interface FromAppointment {
 }
 
 const INSPECTION_LABELS: Record<keyof VehicleInspection, string> = {
-  frontLeft: 'Dianteiro Esquerdo',
-  frontRight: 'Dianteiro Direito',
-  rearLeft: 'Traseiro Esquerdo',
-  rearRight: 'Traseiro Direito',
-  hood: 'Capô',
-  trunk: 'Porta-malas',
-  roof: 'Teto',
-  frontBumper: 'Para-choque Dianteiro',
-  rearBumper: 'Para-choque Traseiro',
+  fluidos: 'Fluidos',
+  freios: 'Freios',
+  motor: 'Motor',
+  eletrica: 'Elétrica',
+  suspensao: 'Suspensão / Direção',
+  pneus: 'Pneus',
+  arCondicionado: 'Ar condicionado',
+  outros: 'Outros',
 }
 
 const INSPECTION_KEYS = Object.keys(INSPECTION_LABELS) as (keyof VehicleInspection)[]

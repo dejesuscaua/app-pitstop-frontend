@@ -43,15 +43,14 @@ export interface InspectionPoint {
 }
 
 export interface VehicleInspection {
-  frontLeft: InspectionPoint
-  frontRight: InspectionPoint
-  rearLeft: InspectionPoint
-  rearRight: InspectionPoint
-  hood: InspectionPoint
-  trunk: InspectionPoint
-  roof: InspectionPoint
-  frontBumper: InspectionPoint
-  rearBumper: InspectionPoint
+  fluidos: InspectionPoint
+  freios: InspectionPoint
+  motor: InspectionPoint
+  eletrica: InspectionPoint
+  suspensao: InspectionPoint
+  pneus: InspectionPoint
+  arCondicionado: InspectionPoint
+  outros: InspectionPoint
 }
 
 export interface Product {

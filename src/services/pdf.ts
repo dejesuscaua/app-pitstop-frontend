@@ -10,151 +10,201 @@ const STATUS_LABEL: Record<string, string> = {
   delivered: 'Entregue',
 }
 
+const INSPECTION_LABELS_PDF: Record<string, string> = {
+  fluidos: 'Fluidos',
+  freios: 'Freios',
+  motor: 'Motor',
+  eletrica: 'Elétrica',
+  suspensao: 'Suspensão / Direção',
+  pneus: 'Pneus',
+  arCondicionado: 'Ar condicionado',
+  outros: 'Outros',
+}
+
 export async function generateOrderPDF(order: Order, shopName: string): Promise<Uint8Array> {
   const doc = await PDFDocument.create()
-  const page = doc.addPage([595, 842])
   const font = await doc.embedFont(StandardFonts.Helvetica)
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
 
-  const { width, height } = page.getSize()
+  const pageWidth = 595
+  const pageHeight = 842
+  const margin = 40
+  const contentWidth = pageWidth - margin * 2
+
   const green = rgb(0.11, 0.62, 0.46)
   const dark = rgb(0.1, 0.1, 0.1)
   const gray = rgb(0.45, 0.45, 0.45)
   const lightGray = rgb(0.95, 0.95, 0.95)
-  const margin = 40
+  const red = rgb(0.8, 0.1, 0.1)
 
-  let y = height - 40
+  let page = doc.addPage([pageWidth, pageHeight])
+  let y = pageHeight - 40
+
+  const ensureSpace = (needed: number) => {
+    if (y - needed < 60) {
+      page.drawText('PitStop OS — pitstop.app', { x: margin, y: 20, size: 8, font, color: gray })
+      page = doc.addPage([pageWidth, pageHeight])
+      y = pageHeight - margin
+    }
+  }
+
+  const drawDivider = () => {
+    page.drawLine({ start: { x: margin, y }, end: { x: pageWidth - margin, y }, thickness: 0.5, color: rgb(0.8, 0.8, 0.8) })
+  }
+
+  const drawSection = (label: string) => {
+    page.drawText(label, { x: margin, y, size: 9, font: bold, color: green })
+    y -= 14
+  }
 
   // Header bar
-  page.drawRectangle({ x: 0, y: height - 70, width, height: 70, color: green })
-  page.drawText('ORDEM DE SERVIÇO', {
-    x: margin,
-    y: height - 48,
-    size: 20,
-    font: bold,
-    color: rgb(1, 1, 1),
-  })
-  page.drawText(`OS #${order.id.slice(0, 8).toUpperCase()}`, {
-    x: width - 160,
-    y: height - 48,
-    size: 11,
-    font,
-    color: rgb(1, 1, 1),
-  })
+  page.drawRectangle({ x: 0, y: pageHeight - 70, width: pageWidth, height: 70, color: green })
+  page.drawText('ORDEM DE SERVIÇO', { x: margin, y: pageHeight - 48, size: 20, font: bold, color: rgb(1, 1, 1) })
+  const osLabel = `OS #${order.id.slice(0, 8).toUpperCase()}`
+  const osLabelW = font.widthOfTextAtSize(osLabel, 11)
+  page.drawText(osLabel, { x: pageWidth - margin - osLabelW, y: pageHeight - 48, size: 11, font, color: rgb(1, 1, 1) })
 
-  y = height - 90
+  y = pageHeight - 90
 
-  // Shop name
+  // Shop name + date
   page.drawText(shopName, { x: margin, y, size: 13, font: bold, color: dark })
-  y -= 14
-
-  // Date
+  y -= 16
   const dateStr = order.createdAt
     ? new Date(order.createdAt).toLocaleDateString('pt-BR')
     : new Date().toLocaleDateString('pt-BR')
   page.drawText(`Data: ${dateStr}`, { x: margin, y, size: 10, font, color: gray })
-  y -= 8
-
-  const drawDivider = (yPos: number) => {
-    page.drawLine({ start: { x: margin, y: yPos }, end: { x: width - margin, y: yPos }, thickness: 0.5, color: rgb(0.8, 0.8, 0.8) })
-  }
-
-  drawDivider(y)
+  y -= 10
+  drawDivider()
   y -= 16
 
-  // Customer section
-  const drawSection = (label: string, yPos: number) => {
-    page.drawText(label, { x: margin, y: yPos, size: 9, font: bold, color: green })
-    return yPos - 14
-  }
-
-  y = drawSection('CLIENTE', y)
+  // Customer
+  drawSection('CLIENTE')
   page.drawText(order.customerName, { x: margin, y, size: 11, font: bold, color: dark })
-  y -= 13
+  y -= 14
+  if (order.customerPhone) {
+    page.drawText(`Tel: ${order.customerPhone}`, { x: margin, y, size: 9, font, color: gray })
+    y -= 12
+  }
 
-  // Vehicle section
-  y -= 6
-  drawDivider(y)
+  // Vehicle
+  y -= 4
+  drawDivider()
   y -= 16
-  y = drawSection('VEÍCULO', y)
+  drawSection('VEÍCULO')
   const v = order.vehicleInfo
   page.drawText(`${v.brand} ${v.model} ${v.year}`, { x: margin, y, size: 11, font: bold, color: dark })
-  y -= 13
+  y -= 14
   page.drawText(`Placa: ${v.plate}   KM: ${v.km.toLocaleString('pt-BR')}`, { x: margin, y, size: 10, font, color: gray })
-  y -= 8
+  y -= 10
 
   // Items table
-  y -= 6
-  drawDivider(y)
+  y -= 4
+  drawDivider()
   y -= 16
-  y = drawSection('SERVIÇOS / PEÇAS', y)
+  drawSection('SERVIÇOS / PEÇAS')
 
-  const colQtd = 340
-  const colUnit = 390
-  const colTotal = 490
-  const descMaxWidth = colQtd - margin - 8
+  // Column positions (right-aligned for numeric cols)
+  const colDescX = margin + 4
+  const colQtdX = margin + contentWidth * 0.57   // ~370
+  const colUnitX = margin + contentWidth * 0.72  // ~452
+  const colTotalRight = pageWidth - margin        // right edge for total column
 
+  ensureSpace(24)
   // Table header
-  page.drawRectangle({ x: margin, y: y - 3, width: width - margin * 2, height: 18, color: lightGray })
-  page.drawText('Descrição', { x: margin + 4, y: y + 2, size: 9, font: bold, color: dark })
-  page.drawText('Qtd', { x: colQtd, y: y + 2, size: 9, font: bold, color: dark })
-  page.drawText('Unitário', { x: colUnit, y: y + 2, size: 9, font: bold, color: dark })
-  page.drawText('Total', { x: colTotal, y: y + 2, size: 9, font: bold, color: dark })
-  y -= 18
+  page.drawRectangle({ x: margin, y: y - 4, width: contentWidth, height: 20, color: lightGray })
+  page.drawText('Descrição', { x: colDescX, y: y + 2, size: 9, font: bold, color: dark })
+  page.drawText('Qtd', { x: colQtdX, y: y + 2, size: 9, font: bold, color: dark })
+  page.drawText('Unitário', { x: colUnitX, y: y + 2, size: 9, font: bold, color: dark })
+  const totalHeaderW = bold.widthOfTextAtSize('Total', 9)
+  page.drawText('Total', { x: colTotalRight - totalHeaderW - 4, y: y + 2, size: 9, font: bold, color: dark })
+  y -= 20
 
   for (const item of order.items) {
+    ensureSpace(18)
     const lineTotal = item.qty * item.unitPrice
-    page.drawText(item.name, { x: margin + 4, y, size: 9, font, color: dark, maxWidth: descMaxWidth })
-    page.drawText(String(item.qty), { x: colQtd, y, size: 9, font, color: dark })
-    page.drawText(BRL(item.unitPrice), { x: colUnit, y, size: 9, font, color: dark })
-    page.drawText(BRL(lineTotal), { x: colTotal, y, size: 9, font, color: dark })
+    const qtyStr = String(item.qty)
+    const unitStr = BRL(item.unitPrice)
+    const totalStr = BRL(lineTotal)
+    const descMaxW = colQtdX - colDescX - 8
+
+    page.drawText(item.name, { x: colDescX, y, size: 9, font, color: dark, maxWidth: descMaxW })
+    page.drawText(qtyStr, { x: colQtdX, y, size: 9, font, color: dark })
+    page.drawText(unitStr, { x: colUnitX, y, size: 9, font, color: dark })
+    const totalW = font.widthOfTextAtSize(totalStr, 9)
+    page.drawText(totalStr, { x: colTotalRight - totalW - 4, y, size: 9, font, color: dark })
     y -= 16
   }
 
-  // Totals box
+  // Totals
+  ensureSpace(80)
   y -= 6
-  drawDivider(y)
+  drawDivider()
   y -= 16
 
-  const drawTotal = (label: string, value: string, isBold = false) => {
-    page.drawText(label, { x: width - 240, y, size: 10, font: isBold ? bold : font, color: isBold ? dark : gray })
-    page.drawText(value, { x: width - margin - 80, y, size: 10, font: isBold ? bold : font, color: isBold ? dark : gray })
-    y -= 14
+  const drawTotalRow = (label: string, value: string, isBold = false, textColor = gray) => {
+    const f = isBold ? bold : font
+    page.drawText(label, { x: pageWidth - margin - 200, y, size: 10, font: f, color: textColor })
+    const valW = f.widthOfTextAtSize(value, 10)
+    page.drawText(value, { x: colTotalRight - valW - 4, y, size: 10, font: f, color: textColor })
+    y -= 16
   }
 
-  drawTotal('Peças:', BRL(order.totalParts))
-  drawTotal('Mão de obra:', BRL(order.laborPrice))
-  y -= 8
+  drawTotalRow('Peças:', BRL(order.totalParts))
+  drawTotalRow('Mão de obra:', BRL(order.laborPrice))
+  y -= 6
 
   // Total box
-  page.drawRectangle({ x: width - 240, y: y - 4, width: 200, height: 22, color: green })
-  page.drawText('TOTAL:', { x: width - 236, y: y + 3, size: 11, font: bold, color: rgb(1, 1, 1) })
-  page.drawText(BRL(order.total), { x: width - margin - 80, y: y + 3, size: 11, font: bold, color: rgb(1, 1, 1) })
-  y -= 28
+  page.drawRectangle({ x: pageWidth - margin - 200, y: y - 5, width: 200, height: 24, color: green })
+  page.drawText('TOTAL:', { x: pageWidth - margin - 196, y: y + 4, size: 11, font: bold, color: rgb(1, 1, 1) })
+  const totalValStr = BRL(order.total)
+  const totalValW = bold.widthOfTextAtSize(totalValStr, 11)
+  page.drawText(totalValStr, { x: colTotalRight - totalValW - 6, y: y + 4, size: 11, font: bold, color: rgb(1, 1, 1) })
+  y -= 30
 
   // Status
-  y -= 6
+  ensureSpace(20)
+  y -= 4
   page.drawText(`Status: ${STATUS_LABEL[order.status] ?? order.status}`, { x: margin, y, size: 10, font, color: gray })
-  y -= 14
+  y -= 16
+
+  // Vehicle Inspection
+  const inspection = order.vehicleInspection
+  const inspectionKeys = inspection
+    ? Object.keys(INSPECTION_LABELS_PDF).filter((k) => (inspection as Record<string, { checked: boolean; note?: string }>)[k]?.checked)
+    : []
+
+  if (inspectionKeys.length > 0) {
+    ensureSpace(20 + inspectionKeys.length * 16)
+    y -= 4
+    drawDivider()
+    y -= 16
+    drawSection('VISTORIA DO VEÍCULO')
+    for (const key of inspectionKeys) {
+      ensureSpace(18)
+      const point = (inspection as Record<string, { checked: boolean; note?: string }>)[key]
+      const label = `⚠ ${INSPECTION_LABELS_PDF[key]}`
+      page.drawText(label, { x: margin + 4, y, size: 9, font: bold, color: red })
+      if (point.note) {
+        const noteX = margin + 4 + bold.widthOfTextAtSize(label, 9) + 8
+        page.drawText(point.note, { x: noteX, y, size: 9, font, color: gray, maxWidth: pageWidth - margin - noteX })
+      }
+      y -= 16
+    }
+  }
 
   // Notes
   if (order.notes) {
+    ensureSpace(40)
     y -= 4
-    drawDivider(y)
+    drawDivider()
     y -= 16
-    y = drawSection('OBSERVAÇÕES', y)
-    page.drawText(order.notes, { x: margin, y, size: 10, font, color: dark, maxWidth: width - margin * 2 })
+    drawSection('OBSERVAÇÕES')
+    page.drawText(order.notes, { x: margin, y, size: 10, font, color: dark, maxWidth: contentWidth })
     y -= 14
   }
 
-  // Footer
-  page.drawText('PitStop OS — pitstop.app', {
-    x: margin,
-    y: 20,
-    size: 8,
-    font,
-    color: gray,
-  })
+  // Footer on last page
+  page.drawText('PitStop OS — pitstop.app', { x: margin, y: 20, size: 8, font, color: gray })
 
   return doc.save()
 }
